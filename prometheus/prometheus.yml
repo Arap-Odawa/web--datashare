@@ -1,0 +1,30 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'traefik'
+    static_configs:
+      # Traefik exposes Prometheus metrics on the dedicated 'metrics' entrypoint
+      # (--entrypoints.metrics.address=:8082), NOT on the 'dashboards' entrypoint
+      # at :8085. Scraping :8085/metrics returns 404 because that entrypoint only
+      # routes /api and /dashboard paths.
+      - targets: ['traefik:8082']
+
+  - job_name: 'fastapi-dash-app'
+    static_configs:
+      - targets: ['dash-app:8045']
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metric_relabel_configs:
+      - source_labels: [name]
+        target_label: container
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']

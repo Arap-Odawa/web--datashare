@@ -1,0 +1,359 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 2,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "home",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "title": "Back to Landing Portal",
+      "type": "link",
+      "url": "/grafana/d/landing-portal/web-datashare-landing-portal"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "title": "CPU Usage (Current vs. Average Baseline & SD Envelope)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{container=~\"$container\"}[1m])) by (container) * 100",
+          "legendFormat": "Current {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(sum(rate(container_cpu_usage_seconds_total{container=~\"$container\"}[1m])) by (container)[1h]) * 100",
+          "legendFormat": "Baseline 1h {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(avg_over_time(sum(rate(container_cpu_usage_seconds_total{container=~\"$container\"}[1m])) by (container)[1h]) + 2 * stddev_over_time(sum(rate(container_cpu_usage_seconds_total{container=~\"$container\"}[1m])) by (container)[1h])) * 100",
+          "legendFormat": "+2 SD {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "clamp_min((avg_over_time(sum(rate(container_cpu_usage_seconds_total{container=~\"$container\"}[1m])) by (container)[1h]) - 2 * stddev_over_time(sum(rate(container_cpu_usage_seconds_total{container=~\"$container\"}[1m])) by (container)[1h])) * 100, 0)",
+          "legendFormat": "-2 SD {{name}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineStyle": {
+              "fill": "dash"
+            }
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "title": "CPU Usage Distribution (Bell-Curve Analysis)",
+      "type": "histogram",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{container=~\"$container\"}[1m])) by (container) * 100",
+          "legendFormat": "{{name}} Distribution",
+          "range": true
+        }
+      ],
+      "options": {
+        "bucketSize": 5,
+        "combine": false
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "title": "Memory Usage (Current vs. Average Baseline & SD Envelope)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(container_memory_usage_bytes{container=~\"$container\"}) by (container)",
+          "legendFormat": "Current {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(sum(container_memory_usage_bytes{container=~\"$container\"}) by (container)[1h])",
+          "legendFormat": "Baseline 1h {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(sum(container_memory_usage_bytes{container=~\"$container\"}) by (container)[1h]) + 2 * stddev_over_time(sum(container_memory_usage_bytes{container=~\"$container\"}) by (container)[1h])",
+          "legendFormat": "+2 SD {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "clamp_min(avg_over_time(sum(container_memory_usage_bytes{container=~\"$container\"}) by (container)[1h]) - 2 * stddev_over_time(sum(container_memory_usage_bytes{container=~\"$container\"}) by (container)[1h]), 0)",
+          "legendFormat": "-2 SD {{name}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "title": "Memory Usage Distribution (Bell-Curve Analysis)",
+      "type": "histogram",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(container_memory_usage_bytes{container=~\"$container\"}) by (container)",
+          "legendFormat": "{{name}} Distribution",
+          "range": true
+        }
+      ],
+      "options": {
+        "combine": false
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "title": "Network IO Rate - Rx/Tx (Current vs. Average Baseline & SD Envelope)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(container_network_receive_bytes_total{container=~\"$container\"}[1m])) by (container)",
+          "legendFormat": "Rx Current {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(sum(rate(container_network_receive_bytes_total{container=~\"$container\"}[1m])) by (container)[1h])",
+          "legendFormat": "Rx Baseline 1h {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(container_network_transmit_bytes_total{container=~\"$container\"}[1m])) by (container)",
+          "legendFormat": "Tx Current {{name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(sum(rate(container_network_transmit_bytes_total{container=~\"$container\"}[1m])) by (container)[1h])",
+          "legendFormat": "Tx Baseline 1h {{name}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "title": "Network Rx Distribution (Bell-Curve Analysis)",
+      "type": "histogram",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(container_network_receive_bytes_total{container=~\"$container\"}[1m])) by (container)",
+          "legendFormat": "Rx {{name}} Distribution",
+          "range": true
+        }
+      ],
+      "options": {
+        "combine": false
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": [
+    "web-datashare",
+    "containers"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(container_cpu_usage_seconds_total{container!=\"\"}, container)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "container",
+        "options": [],
+        "query": {
+          "query": "label_values(container_cpu_usage_seconds_total{container!=\"\"}, container)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Overall Pod & Container Metrics",
+  "uid": "overall-pod-metrics",
+  "version": 1,
+  "weekStart": ""
+}

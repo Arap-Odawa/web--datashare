@@ -1,0 +1,378 @@
+services:
+  traefik:
+    image: rapidfort/traefik-ib:v3.6.5-4880204
+    container_name: traefik
+    # 1. ADD THIS LINE: Force the container to run as the mapped host user
+    user: "0:0"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - PUID=1000
+      - PGID=1000
+    env_file:
+      - .env
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # Entrypoint for the public App
+      - "--entrypoints.web.address=:8045"
+      # Secure Entrypoint for Dashboards
+      - "--entrypoints.dashboards.address=:8085"
+      # Enable the Traefik API/Dashboard in secure mode
+      - "--api=true"
+      - "--api.dashboard=true" 
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addRoutersLabels=true"
+      - "--entrypoints.metrics.address=:8082" # Entrypoint for Prometheus to scrape
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--accesslog.fields.defaultmode=keep"
+      - "--accesslog.fields.headers.defaultmode=keep"
+      - "--accesslog.fields.headers.names.Authorization=drop"
+    ports:
+      - "8045:8045" # Public App
+      - "8085:8085" # Secure Dashboards (Traefik, Grafana & Prometheus)
+    volumes:
+      # FIX: Dynamically map the rootless socket path based on the user's actual UID
+      #- "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/run/user/1000/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - "traefik.enable=true"
+      # Define the Basic Auth middleware using the .env variable
+      - "traefik.http.middlewares.admin-auth.basicauth.users=${DASHBOARDS_USERNAME?Variable not set}:${HASHED_PASSWORD?Variable not set}"
+      
+      # DDoS Protection: Rate limit public traffic to 10 req/min per source IP with a burst of 5.
+      # Applied to the dashapp router (public web entrypoint on port 8045).
+      - "traefik.http.middlewares.rate-limit-public.ratelimit.average=${RATELIMIT_RPM?Variable not set}"
+      - "traefik.http.middlewares.rate-limit-public.ratelimit.burst=${RATELIMIT_RPM_BURST?Variable not set}"
+      - "traefik.http.middlewares.rate-limit-public.ratelimit.period=${RATELIMIT_PERIOD?Variable not set}"
+      - "traefik.http.middlewares.rate-limit-public.ratelimit.sourcecriterion.ipstrategy.depth=1"
+      
+      # Route the Traefik Dashboard to the 8085 port and apply Auth
+      - "traefik.http.routers.traefik-dash.rule=PathPrefix(`/api`) || PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.traefik-dash.entrypoints=dashboards"
+      - "traefik.http.routers.traefik-dash.service=api@internal"
+      - "traefik.http.routers.traefik-dash.middlewares=admin-auth"
+    restart: unless-stopped 
+    networks:
+      - traefik_public 
+      - internals_network
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+
+  prometheus:
+    image: prom/prometheus:v3
+    container_name: prometheus
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+    env_file:
+      - .env
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - '--storage.tsdb.retention.size=512MB'
+      # Tells Prometheus it is being served under a sub-path
+      - "--web.external-url=/prometheus/" 
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    labels:
+      - "traefik.enable=true"
+      # Route Prometheus to 8085 under /prometheus/ and apply Auth
+      - "traefik.http.routers.prom.rule=PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prom.entrypoints=dashboards"
+      - "traefik.http.routers.prom.middlewares=admin-auth"
+      - "traefik.http.services.prom.loadbalancer.server.port=9090"
+    restart: unless-stopped 
+    depends_on:
+      - traefik
+    networks:
+      - traefik_public 
+      - internals_network
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+
+  grafana:
+    image: rapidfort/grafana-ib:12.3.1-4880298
+    container_name: grafana
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_public"
+      # Public route on port 8045 (NO AUTH APPLIED HERE)
+      - "traefik.http.routers.grafana.rule=PathPrefix(`/grafana/`)"
+      - "traefik.http.routers.grafana.entrypoints=dashboards"
+      - "traefik.http.routers.grafana.middlewares=admin-auth"
+      - "metrics.prometheus=true"
+      - "metrics.prometheus.addEntryPointsLabels=true"
+      - "metrics.prometheus.addRoutersLabels=true"
+      - "entrypoints.metrics.address=:3000" 
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USERNAME?Variable not set}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD?Variable not set}
+      # Required to serve Grafana UI cleanly behind a /grafana/ path
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    env_file:
+      - .env
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - traefik_public
+      - internals_network 
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /sys:/sys:ro
+      - ${DOCKER_DATA_ROOT:-/var/lib/docker}:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    tmpfs:
+      - /run
+    restart: unless-stopped
+    networks:
+      - internals_network
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+
+  redis:
+      image: redis:7-alpine
+      container_name: redis_cache
+      # FIX: Instruct Docker to run the container as your specific non-root user.
+      # This bypasses the internal entrypoint script that is failing to run `setpriv`.
+      user: "${PUID:-1000}:${PGID:-1000}"
+      extra_hosts:
+        - host.docker.internal:host-gateway
+      security_opt:
+        - no-new-privileges:true
+      cap_drop:
+        - ALL
+      cap_add:
+        - NET_ADMIN
+      environment:
+        - PUID=${PUID:-1000}
+        - PGID=${PGID:-1000}
+      ports:
+        - "127.0.0.1:6379:6379" 
+      restart: unless-stopped
+      networks:
+        - internals_network
+      # This command does not persist the redis to the redis volume
+      command: redis-server --save "" --loglevel warning 
+      logging:
+        driver: fluentd
+        options:
+          fluentd-address: "localhost:24224"
+          tag: "docker.{{.Name}}"
+          fluentd-async: "true"
+
+  dash-app:
+    build: .
+    deploy:
+      mode: replicated
+      # Added a fallback of 1 incase the variable is missing from .env
+      replicas: ${NUM_WEB_VIZ_WORKERS_DEV:-1} 
+    volumes:
+      - ./app:/app
+    expose:
+      - "8045"
+    labels:
+      - "traefik.enable=true"
+      # Public route on port 8045 (NO AUTH APPLIED HERE, auth is managed by FastAPI app internally for docs)
+      - "traefik.http.routers.dashapp.rule=PathPrefix(`/data-review-meeting-visuals/`) || PathPrefix(`/data-trends-dashboard`) || PathPrefix(`/chat_app/`) || PathPrefix(`/v1/b0e7893b0c39426258b11a88798c438/nym-viz/`) || PathPrefix(`/`)"
+      - "traefik.http.routers.dashapp.entrypoints=web"
+      - "traefik.http.routers.dashapp.middlewares=rate-limit-public"
+      - "traefik.http.services.dashapp.loadbalancer.server.port=8045"
+      - "metrics.prometheus=true"
+      - "metrics.prometheus.addEntryPointsLabels=true"
+      - "metrics.prometheus.addRoutersLabels=true"
+      - "entrypoints.metrics.address=:8082" 
+    restart: unless-stopped 
+    env_file:
+      - .env
+    depends_on:
+      - prometheus
+      - redis
+      - db-postgres
+    networks:
+      - internals_network 
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+
+  free-llm-api:
+    build:
+      context: ./free_llm_api
+      dockerfile: Dockerfile
+      # FIX (Ubuntu 20 / Rootless Docker): Use host network during build so that
+      # `npm ci` inside the build container can resolve npm registry hostnames
+      # through the host's /etc/resolv.conf (set to 1.1.1.1/8.8.8.8 by v17 step 2.5).
+      # Without this, the build container's isolated network namespace cannot reach
+      # the systemd-resolved loopback stub at 127.0.0.53, causing npm install failures.
+      network: host
+    container_name: free-llm-api
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      - PORT=3001
+      - UNIFIED_API_KEY=${UNIFIED_API_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+    volumes:
+      - free_llm_api_data:/app/server/data
+      - ./.env:/app/.env:ro
+    restart: unless-stopped
+    networks:
+      - internals_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.free-llm-api.rule=PathPrefix(`/free-llm-api`)"
+      - "traefik.http.routers.free-llm-api.entrypoints=dashboards"
+      - "traefik.http.routers.free-llm-api.middlewares=admin-auth,free-llm-api-redirect,free-llm-api-stripprefix"
+      - "traefik.http.services.free-llm-api.loadbalancer.server.port=3001"
+      - "traefik.http.middlewares.free-llm-api-stripprefix.stripprefix.prefixes=/free-llm-api"
+      - "traefik.http.middlewares.free-llm-api-redirect.redirectregex.regex=^(http|https)://([^/]+)/free-llm-api$$"
+      - "traefik.http.middlewares.free-llm-api-redirect.redirectregex.replacement=$$1://$$2/free-llm-api/"
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+
+  db-postgres:
+    image: postgres:15-alpine
+    container_name: db-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - internals_network
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+
+  elasticsearch:
+    image: elasticsearch:7.17.15
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    networks:
+      - internals_network
+
+  kafka:
+    image: apache/kafka:4.2.0
+    container_name: kafka
+    environment:
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      - CLUSTER_ID=abcdefghijklmnopqrstuv
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+    restart: unless-stopped
+    networks:
+      - internals_network
+
+  fluent-bit:
+    #image: fluent/fluent-bit:2.1.8
+    image: fluent/fluent-bit:5.0.7-amd64
+    container_name: fluent-bit
+    ports:
+      - "127.0.0.1:24224:24224"
+      - "127.0.0.1:24224:24224/udp"
+    volumes:
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./app/loguru_logs:/var/log/loguru
+      - ./fluent-bit/scripts:/fluent-bit/scripts:ro
+    restart: unless-stopped
+    networks:
+      - internals_network
+    depends_on:
+      - kafka
+
+  vector:
+    image: timberio/vector:0.30.0-debian
+    container_name: vector
+    volumes:
+      - ./vector/vector.toml:/etc/vector/vector.toml
+      - ${COLD_LOGS_DIR:-archive_logs}:/var/log/archive
+    restart: unless-stopped
+    networks:
+      - internals_network
+    depends_on:
+      - kafka
+      - elasticsearch
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  free_llm_api_data:
+  postgres_data:
+  es_data:
+  archive_logs:
+
+networks:
+  internals_network:
+    external: true
+    name: internals_network
+  traefik_public:
+    external: true
+    name: traefik_public

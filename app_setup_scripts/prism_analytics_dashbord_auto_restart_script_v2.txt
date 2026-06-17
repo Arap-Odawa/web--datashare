@@ -1,0 +1,17 @@
+[Unit]
+Description=Gunicorn instance to serve NYM PRISM Analytics Dashboard
+After=network.target
+
+[Service]
+User=dmaritim
+Group=www-data
+# Updated to your Music folder path
+WorkingDirectory=/home/ubuntu/Music/dash_app
+# We call gunicorn from the venv, binding to all IPs on port 8050
+# 'app:server' means: look in app.py for the variable named 'server'
+ExecStart=/home/ubuntu/Music/dash_app/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:8050 app:server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,282 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 3,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "home",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "title": "Back to Landing Portal",
+      "type": "link",
+      "url": "/grafana/d/landing-portal/web-datashare-landing-portal"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "title": "Request Rate (Current vs. Average Baseline & SD Envelope)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(dash_app_function_requests_total{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name, status)",
+          "legendFormat": "Current {{category}} - {{function_name}} ({{status}})",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(sum(rate(dash_app_function_requests_total{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name, status)[1h])",
+          "legendFormat": "Baseline 1h {{category}} - {{function_name}} ({{status}})",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(sum(rate(dash_app_function_requests_total{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name, status)[1h]) + 2 * stddev_over_time(sum(rate(dash_app_function_requests_total{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name, status)[1h])",
+          "legendFormat": "+2 SD {{category}} - {{function_name}} ({{status}})",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "clamp_min(avg_over_time(sum(rate(dash_app_function_requests_total{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name, status)[1h]) - 2 * stddev_over_time(sum(rate(dash_app_function_requests_total{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name, status)[1h]), 0)",
+          "legendFormat": "-2 SD {{category}} - {{function_name}} ({{status}})",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "title": "Request Rate Distribution (Bell-Curve Analysis)",
+      "type": "histogram",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(dash_app_function_requests_total{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name, status)",
+          "legendFormat": "{{function_name}} ({{status}}) Rate Distribution",
+          "range": true
+        }
+      ],
+      "options": {
+        "combine": false
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "title": "Function Duration (Current vs. Average Baseline & SD Envelope)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(dash_app_function_duration_seconds_sum{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name) / sum(rate(dash_app_function_duration_seconds_count{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name)",
+          "legendFormat": "Current {{category}} - {{function_name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time((sum(rate(dash_app_function_duration_seconds_sum{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name) / sum(rate(dash_app_function_duration_seconds_count{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name))[1h])",
+          "legendFormat": "Baseline 1h {{category}} - {{function_name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time((sum(rate(dash_app_function_duration_seconds_sum{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name) / sum(rate(dash_app_function_duration_seconds_count{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name))[1h]) + 2 * stddev_over_time((sum(rate(dash_app_function_duration_seconds_sum{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name) / sum(rate(dash_app_function_duration_seconds_count{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name))[1h])",
+          "legendFormat": "+2 SD {{category}} - {{function_name}}",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "clamp_min(avg_over_time((sum(rate(dash_app_function_duration_seconds_sum{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name) / sum(rate(dash_app_function_duration_seconds_count{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name))[1h]) - 2 * stddev_over_time((sum(rate(dash_app_function_duration_seconds_sum{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name) / sum(rate(dash_app_function_duration_seconds_count{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name))[1h]), 0)",
+          "legendFormat": "-2 SD {{category}} - {{function_name}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "title": "Function Duration Distribution (Bell-Curve Analysis)",
+      "type": "histogram",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(dash_app_function_duration_seconds_sum{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name) / sum(rate(dash_app_function_duration_seconds_count{category=~\"$category\", function_name=~\"$function_name\"}[1m])) by (category, function_name)",
+          "legendFormat": "{{function_name}} Duration Distribution",
+          "range": true
+        }
+      ],
+      "options": {
+        "combine": false
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["web-datashare", "functions"],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(dash_app_function_requests_total, category)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "category",
+        "options": [],
+        "query": {
+          "query": "label_values(dash_app_function_requests_total, category)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(dash_app_function_requests_total{category=~\"$category\"}, function_name)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "function_name",
+        "options": [],
+        "query": {
+          "query": "label_values(dash_app_function_requests_total{category=~\"$category\"}, function_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Application Function Performance Metrics",
+  "uid": "function-performance",
+  "version": 1,
+  "weekStart": ""
+}

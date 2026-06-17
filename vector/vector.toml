@@ -1,0 +1,65 @@
+[sources.kafka_in]
+type = "kafka"
+bootstrap_servers = "kafka:9092"
+group_id = "vector-group"
+topics = ["app-logs"]
+
+[transforms.parse_logs]
+type = "remap"
+inputs = ["kafka_in"]
+source = """
+# Parse JSON from Fluent Bit
+if is_string(.message) {
+  parsed, err = parse_json(.message)
+  if err == null {
+    # Merge parsed fields into root
+    ., err = merge(., parsed)
+  }
+}
+
+# If the log field itself is a JSON string (e.g. from Traefik access logs or JSON container outputs), parse and merge it
+if is_string(.log) {
+  parsed_log, err = parse_json(.log)
+  if err == null {
+    ., err = merge(., parsed_log)
+  }
+}
+
+# Determine service/container name from container_tag
+if is_string(.container_tag) {
+  tag = string!(.container_tag)
+  if starts_with(tag, "docker.") {
+    .container_name = replace(tag, "docker.", "")
+  } else {
+    .container_name = tag
+  }
+} else {
+  .container_name = "unknown"
+}
+
+# Standardize container name to lowercase and replace dots with dashes for Elasticsearch compatibility
+.container_name = downcase(.container_name)
+.container_name = replace(.container_name, ".", "-")
+
+# Set a fallback @timestamp if not parsed (Grafana ES datasource expects @timestamp)
+if !exists(."@timestamp") {
+  ."@timestamp" = now()
+}
+"""
+
+[sinks.elasticsearch_out]
+type = "elasticsearch"
+inputs = ["parse_logs"]
+endpoints = ["http://elasticsearch:9200"]
+mode = "bulk"
+healthcheck.enabled = false
+
+[sinks.elasticsearch_out.bulk]
+index = "app-logs-{{container_name}}-%Y-%m-%d"
+
+
+[sinks.file_out]
+type = "file"
+inputs = ["parse_logs"]
+path = "/var/log/archive/archive-{{container_name}}-%Y-%m-%d.log"
+encoding.codec = "json"

@@ -1,0 +1,13 @@
+apiVersion: 1
+
+datasources:
+  - name: Elasticsearch Logs
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    uid: elasticsearch-logs
+    jsonData:
+      timeField: '@timestamp'
+      index: 'app-logs-*'
+      interval: Daily
+      version: 7

@@ -1,0 +1,184 @@
+
+services:
+  traefik:
+    image: rapidfort/traefik-ib:v3.6.5-4880204
+    container_name: traefik
+    # 1. ADD THIS LINE: Force the container to run as the mapped host user
+    user: "0:0"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - PUID=1000
+      - PGID=1000
+    env_file:
+      - .env
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # Entrypoint for the public App
+      - "--entrypoints.web.address=:8045"
+      # Secure Entrypoint for Dashboards
+      - "--entrypoints.dashboards.address=:8085"
+      # Enable the Traefik API/Dashboard in secure mode
+      - "--api.dashboard=true" 
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addRoutersLabels=true"
+    ports:
+      - "8045:8045" # Public App
+      - "8085:8085" # Secure Dashboards (Traefik, Grafana & Prometheus)
+    volumes:
+      #- "/var/run/docker.sock:/var/run/docker.sock:ro"
+      # FIX: Point Traefik to the rootless Docker socket on the host
+      - "/run/user/1000/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - "traefik.enable=true"
+      # 1. Define the Basic Auth middleware using the .env variable
+      #- "traefik.http.middlewares.admin-auth.basicauth.users=${DASHBOARD_CREDENTIALS?Variable not set}"
+      - "traefik.http.middlewares.admin-auth.basicauth.users=${DASHBOARDS_USERNAME?Variable not set}:${HASHED_PASSWORD?Variable not set}"
+      
+      # 2. Route the Traefik Dashboard to the 8085 port and apply Auth
+      - "traefik.http.routers.traefik-dash.rule=PathPrefix(`/traefik`) || PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.traefik-dash.entrypoints=dashboards"
+      - "traefik.http.routers.traefik-dash.service=api@internal"
+      - "traefik.http.routers.traefik-dash.middlewares=admin-auth"
+    restart: unless-stopped # unless-stopped is best since it allows the user to stop the docker incase there are needs for upgrades without having to fight the restarts. 07032026.
+    networks:
+      - traefik_public 
+      - internals_network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '2000M'
+        max-file: '10'
+
+
+
+  prometheus:
+    #image: rapidfort/prometheus-operator-ib:v0.88.0-4880703
+    image: prom/prometheus:v3
+    container_name: prometheus
+    # 1. ADD THIS LINE: Force the container to run as the mapped host user
+    user: "0:0"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      - PUID=1000
+      - PGID=1000
+    env_file:
+      - .env
+    ports:
+      - '9090:9090'
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      # Tells Prometheus it is being served under a sub-path
+      - "--web.external-url=/prometheus/" 
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    labels:
+      - "traefik.enable=true"
+      # Route Prometheus to 8085 under /prometheus/ and apply Auth
+      - "traefik.http.routers.prom.rule=PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prom.entrypoints=dashboards"
+      - "traefik.http.routers.prom.middlewares=admin-auth"
+      - "traefik.http.services.prom.loadbalancer.server.port=9090"
+    restart: unless-stopped # unless-stopped is best since it allows the user to stop the docker incase there are needs for upgrades without having to fight the restarts. 07032026.
+    depends_on:
+      - traefik
+    networks:
+      - traefik_public 
+      - internals_network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '2000M'
+        max-file: '10'
+
+
+  grafana:
+    image: rapidfort/grafana-ib:12.3.1-4880298
+    container_name: grafana
+    # 1. ADD THIS LINE: Force the container to run as the mapped host user
+    user: "0:0"    
+    labels:
+      - "traefik.enable=true"
+      # Public route on port 8045 (NO AUTH APPLIED HERE)
+      - "traefik.http.routers.grafana.rule=PathPrefix(`/grafana/`)"
+      - "traefik.http.routers.grafana.entrypoints=dashboards"
+      - "traefik.http.routers.grafana.middlewares=admin-auth"
+    environment:
+      - GF_SECURITY_ADMIN_USER=web_viz_admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped # unless-stopped is best since it allows the user to stop the docker incase there are needs for upgrades without having to fight the restarts. 07032026.
+    networks:
+      - traefik_public 
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '2000M'
+        max-file: '10'
+
+
+
+  dash-app:
+    build: .
+    container_name: dash_app
+    volumes:
+      - ./app:/app
+    labels:
+      - "traefik.enable=true"
+      # Public route on port 8045 (NO AUTH APPLIED HERE)
+      - "traefik.http.routers.dashapp.rule=PathPrefix(`/data-review-meeting-visuals/`) || PathPrefix(`/data-trends-dashboard`)"
+      - "traefik.http.routers.dashapp.entrypoints=web"
+      - "traefik.http.services.dashapp.loadbalancer.server.port=8045"
+      - "traefik.docker.network=internals_network"
+    restart: unless-stopped # unless-stopped is best since it allows the user to stop the docker incase there are needs for upgrades without having to fight the restarts. 07032026.
+    env_file:
+      - .env
+    depends_on:
+      - prometheus
+   # deploy:
+   #   replicas: 2
+    networks:
+      - internals_network 
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '2000M'
+        max-file: '10'
+
+
+
+
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+
+networks:
+  internals_network:
+    external: true
+    name: internals_network
+  traefik_public:
+    external: true
+    name: traefik_public
+
+
+    

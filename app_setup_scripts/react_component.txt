@@ -1,0 +1,26 @@
+import React from 'react'
+import classes from './App.module.css'
+
+// REPLACE THIS WITH YOUR RUNNING DASH APP URL
+const DASH_APP_URL = "https://102.220.23.43:8050"; 
+
+const MyApp = () => {
+    return (
+        <div className={classes.container}>
+            <iframe
+                src={DASH_APP_URL}
+                title="NYM PRISM Analytics"
+                style={{
+                    width: '100%',
+                    height: '800px', // Adjust height as needed
+                    border: 'none',
+                    overflow: 'hidden'
+                }}
+                // Allow interactions within the iframe
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            />
+        </div>
+    )
+}
+
+export default MyApp

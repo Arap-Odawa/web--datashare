@@ -1,0 +1,160 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "title": "Welcome to Web DataShare Telemetry Portal",
+      "type": "text",
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# 📊 Web DataShare - Operations & Monitoring Portal\n\nWelcome to the centralized monitoring and telemetry dashboard. From here, you can navigate the various metric pages to track application and infrastructure performance.\n\n### 🧭 Table of Contents\n\n1. **[Overall Pod & Container Metrics](/grafana/d/overall-pod-metrics/overall-pod-container-metrics)**\n   * Exposes CPU, Memory, Network, and Disk utilization for all **12 containers** in the stack.\n   * Features PromQL historical average baselines, standard deviation bounds, and frequency distribution (bell-curve) histogram analysis.\n\n2. **[Application Function Metrics](/grafana/d/function-performance/application-function-performance-metrics)**\n   * Monitors internal Python backend execution times and success rates classified by category (reads, writes, updates, LLM queries, and visualization loads).\n   * Filters performance statistics and plots frequency distributions side-by-side with execution averages.\n\n3. **[Cross-Pod Comparison](/grafana/d/cross-pod-comparison/cross-pod-comparison)**\n   * Contrasts resource footprints and response times side-by-side across load-balanced replicas and different services.\n\n4. **[Incident Triangulation](/grafana/d/incident-triangulation/incident-triangulation)**\n   * Integrates centralized logs (from Elasticsearch/Vector) side-by-side with container resource metrics for fast incident troubleshooting.\n",
+        "mode": "markdown"
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "title": "Total Tracked Containers",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "count(sum(container_memory_usage_bytes{container!=\"\"}) by (container))",
+          "legendFormat": "Running Containers",
+          "range": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "id": 3,
+      "title": "Average CPU Utilization (All Containers)",
+      "type": "gauge",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg(sum(rate(container_cpu_usage_seconds_total{container!=\"\"}[1m])) by (container)) * 100",
+          "legendFormat": "Avg CPU %",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "id": 4,
+      "title": "Total Memory Footprint",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(container_memory_usage_bytes{container!=\"\"})",
+          "legendFormat": "Total RAM Usage",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center"
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["web-datashare", "toc"],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Web DataShare Landing Portal",
+  "uid": "landing-portal",
+  "version": 1,
+  "weekStart": ""
+}

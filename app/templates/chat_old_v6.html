@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web DataShare Agentic AI Chat</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F9F9F9; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .chat-container { width: 100%; max-width: 800px; background: white; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; }
+        .chat-header { background: #002060; color: white; padding: 15px 20px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center;}
+        
+        /* FIX 1: Added min-height: 0 so flexbox respects the scroll area and doesn't stretch */
+        .chat-messages { flex: 1; min-height: 0; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        
+        /* Removed width: 100% and increased max-width to allow more graph room */
+        .message { padding: 12px 16px; border-radius: 8px; max-width: 90%; line-height: 1.5; word-wrap: break-word; }
+        .user-msg { background: #5b9bd5; color: white; align-self: flex-end; }
+        .ai-msg { background: #f1f1f1; color: #333; align-self: flex-start; }
+        
+        /* FIX 2: Added box-sizing, max-width, overflow, and min-height */
+        .graph-container { 
+            margin-top: 15px; 
+            background: white; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            padding: 10px; 
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow-x: auto; 
+            min-height: 350px; 
+        }
+        
+        .chat-input-area { display: flex; padding: 15px; border-top: 1px solid #ddd; background: #fafafa; border-radius: 0 0 10px 10px;}
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        button { background: #002060; color: white; border: none; padding: 12px 20px; margin-left: 10px; border-radius: 5px; cursor: pointer; font-size: 16px;}
+        button:hover { background: #003399; }
+        select { padding: 10px; margin-right: 15px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h2 style="margin: 0;">📊 Web - DataShare Agentic AI Assistant</h2>
+        <select id="llm-provider">
+            <option value="sglang">Local LLM (SGLang)</option>
+            <option value="vllm">Local LLM (vLLM)</option>
+            <option value="gpt-4o">OpenAI (GPT-4o)</option>
+            <option value="claude-opus-4-5">Claude 4.5 (Opus)</option>
+            <option value="claude-opus-4-6">Claude 4.6 (Opus)</option>
+            <option value="gemini-3-pro-preview">Gemini 3.5 Pro</option>
+            <option value="gemini-3-flash-preview">Gemini 3.5 Fast</option>
+        </select>
+    </div>
+    
+    <div class="chat-messages" id="chat-messages">
+        <div class="message ai-msg">
+            Hello! I'm your Agentic DataShare Assistant. Ask me to pull up indicators like "Show me HTS_TST performance in Nyamira" or "What are the TX_NEW trends?"
+        </div>
+    </div>
+    
+    <div class="chat-input-area">
+        <input type="text" id="user-input" placeholder="Type your data query here..." onkeypress="handleKeyPress(event)">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    async function sendMessage() {
+        const inputField = document.getElementById("user-input");
+        const messageText = inputField.value.trim();
+        const provider = document.getElementById("llm-provider").value;
+        if (!messageText) return;
+
+        // 1. Add User Message to UI
+        appendMessage(messageText, "user-msg");
+        inputField.value = "";
+
+        // 2. Add temporary loading indicator
+        const loadingId = "load-" + Date.now();
+        appendMessage("Thinking and fetching data...", "ai-msg", loadingId);
+
+        // 3. Call the FastAPI backend
+        const apiUrl = "{{ chat_app_url }}/chat_app/api/chat";
+        try {
+            const response = await fetch(apiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: messageText, provider: provider })
+            });
+            
+            const data = await response.json();
+            document.getElementById(loadingId).remove();
+
+            // Catch backend HTTP errors
+            if (!response.ok) {
+                const errorMsg = data.detail ? JSON.stringify(data.detail) : "Unknown Server Error";
+                appendMessage("❌ Backend Error: " + errorMsg, "ai-msg");
+                console.error("Backend Error Data:", data);
+                return;
+            }
+
+            // 4. Render AI Text and Graph
+            renderAIResponse(data.text, data.graphs);
+            
+        } catch (error) {
+            if (document.getElementById(loadingId)) {
+                document.getElementById(loadingId).innerText = "Error connecting to the AI endpoint.";
+            }
+            console.error("Fetch/Network Error:", error);
+        }
+    }
+
+    function appendMessage(text, className, id = null) {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "message " + className;
+        msgDiv.innerText = text;
+        if (id) msgDiv.id = id;
+        
+        const container = document.getElementById("chat-messages");
+        container.appendChild(msgDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // Update only the renderAIResponse function inside your <script> tag:
+    
+    function renderAIResponse(text, graphsArray) {
+        const container = document.getElementById("chat-messages");
+        
+        const aiWrapper = document.createElement("div");
+        aiWrapper.className = "message ai-msg";
+        
+        const textDiv = document.createElement("div");
+        //textDiv.innerHTML = text.replace(/\n/g, "<br>");
+        textDiv.innerHTML = marked.parse(text);
+        aiWrapper.appendChild(textDiv);
+
+        // Check the newly named graphsArray
+        if (graphsArray && graphsArray.length > 0) {
+            graphsArray.forEach((graphJsonString, index) => {
+                const graphContainer = document.createElement("div");
+                graphContainer.className = "graph-container";
+                const plotDivId = "plot-" + Date.now() + "-" + index;
+                graphContainer.id = plotDivId;
+                aiWrapper.appendChild(graphContainer);
+                
+                // Append to DOM first so Plotly can calculate container dimensions
+                if (!aiWrapper.parentNode) {
+                    container.appendChild(aiWrapper); 
+                }
+                
+                const figureData = JSON.parse(graphJsonString);
+                
+                // Let Plotly autosize to the CSS container
+                if (figureData.layout) {
+                    figureData.layout.autosize = true;
+                    delete figureData.layout.width;
+                    delete figureData.layout.height;
+                } else {
+                    figureData.layout = { autosize: true };
+                }
+                Plotly.newPlot(plotDivId, figureData.data, figureData.layout, {responsive: true});
+            });
+        } else {
+            // CRITICAL FIX: If there are no graphs, we still need to append the text!
+            container.appendChild(aiWrapper);
+        }
+
+        // Use a tiny timeout to ensure scroll calculates *after* Plotly renders its SVG
+        setTimeout(() => {
+            container.scrollTop = container.scrollHeight;
+        }, 100);
+    }
+
+    /*
+    function renderAIResponse(text, graphJsonString) {
+        const container = document.getElementById("chat-messages");
+        
+        const aiWrapper = document.createElement("div");
+        aiWrapper.className = "message ai-msg";
+        
+        const textDiv = document.createElement("div");
+        textDiv.innerHTML = text.replace(/\n/g, "<br>");
+        aiWrapper.appendChild(textDiv);
+
+
+        // Inside your renderAIResponse function:
+        if (data.graphs && data.graphs.length > 0) {
+            data.graphs.forEach((graphJsonString, index) => {
+                const graphContainer = document.createElement("div");
+                graphContainer.className = "graph-container";
+                const plotDivId = "plot-" + Date.now() + "-" + index;
+                graphContainer.id = plotDivId;
+                aiWrapper.appendChild(graphContainer);
+                
+                // Append to DOM first so Plotly can find the container dimensions
+                container.appendChild(aiWrapper); // Append before plotting
+                
+                const figureData = JSON.parse(graphJsonString);
+                // FIX 3: Delete hardcoded sizes so Plotly autosizes to the CSS container
+                if (figureData.layout) {
+                    figureData.layout.autosize = true;
+                    delete figureData.layout.width;
+                    delete figureData.layout.height;
+                } else {
+                    figureData.layout = { autosize: true };
+                }
+                Plotly.newPlot(plotDivId, figureData.data, figureData.layout, {responsive: true});
+            });
+        }
+
+
+        if (graphJsonString) {
+            const graphContainer = document.createElement("div");
+            graphContainer.className = "graph-container";
+            const plotDivId = "plot-" + Date.now();
+            graphContainer.id = plotDivId;
+            aiWrapper.appendChild(graphContainer);
+            
+            // Append to DOM first so Plotly can find the container dimensions
+            container.appendChild(aiWrapper);
+            
+            const figureData = JSON.parse(graphJsonString);
+            
+            // FIX 3: Delete hardcoded sizes so Plotly autosizes to the CSS container
+            if (figureData.layout) {
+                figureData.layout.autosize = true;
+                delete figureData.layout.width;
+                delete figureData.layout.height;
+            } else {
+                figureData.layout = { autosize: true };
+            }
+
+            Plotly.newPlot(plotDivId, figureData.data, figureData.layout, {responsive: true});
+        } else {
+            container.appendChild(aiWrapper);
+        }
+        
+
+
+        // Use a tiny timeout to ensure scroll calculates *after* Plotly renders its SVG
+        setTimeout(() => {
+            container.scrollTop = container.scrollHeight;
+        }, 100);
+    }
+
+    */
+
+    function handleKeyPress(event) {
+        if (event.key === "Enter") sendMessage();
+    }
+</script>
+
+</body>
+</html>

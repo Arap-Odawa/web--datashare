@@ -1,0 +1,65 @@
+apiVersion: 1
+
+providers:
+  - name: 'ai_generated_dashboards'
+    orgId: 1
+    folder: 'AI Generated Dashboards'
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/ai_generated_dashboards
+
+  - name: "systems"
+    orgId: 1
+    folder: "Systems"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/systems
+
+  - name: "infrastructure"
+    orgId: 1
+    folder: "Traefik Infrastructure"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/traefik_infrastructure
+
+  - name: "docker"
+    orgId: 1
+    folder: "Docker Containers"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/docker_containers
+
+  - name: "docker2"
+    orgId: 1
+    folder: "Docker Containers -2"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/general_docker_containers
+
+  - name: "infrastructure2"
+    orgId: 1
+    folder: "Traefik Infrastructure -2"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/general_traefik_containers
+
+
