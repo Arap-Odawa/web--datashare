@@ -1,4 +1,4 @@
-# Web DataShare: Agentic Ai Powered Data Review Meeting Visuals
+# Web DataShare: Agentic AI Powered Data Review Meeting Visuals
 
 This application is a comprehensive, agentic AI powered, data visualization and review dashboard designed for tracking, analyzing, and presenting key health performance indicators. The landing page serves as the central "Summary Performance Dashboard," allowing stakeholders to instantly monitor program performance against established targets.
 
