@@ -61,3 +61,19 @@ Universal Endpoint (/v1/chat/completions): Eliminates the need for multiple SDKs
 **Secure Credential Management**: Ensures your API keys remain safe by storing them with local encryption.
 
 **Why it matters**: Managing seventeen different APIs, rate limits, and failure points is a logistical nightmare. This integration collapses that complexity, allowing developers to point any standard OpenAI client at a single local server and access massive, reliable inference capacity without the overhead.
+
+## Comprehensive Caching, Observability & Monitoring Stack
+
+The infrastructure includes:
+
+**Traefik**: For load balancing and routing requests to relevant APIs.
+
+**Fluentd**: For logging all CLI output for complete observability of user transactions.
+
+**Redis**: Caching the frequently accessed visualizations and user requests to the Agentic AI pipeline.
+
+**Prometheus**: Storage of usage metrics from the main application, the routing infrastructure (Traefik) and the docker containers.
+
+**Grafana**: Visualization of the usage metrics and logs from the logging pipeline.
+
+And many more.....
