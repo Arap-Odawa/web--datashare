@@ -1,6 +1,6 @@
-# Web DataShare: Data Review Meeting Visuals
+# Web DataShare: Agentic Ai Powered Data Review Meeting Visuals
 
-This application is a comprehensive data visualization and review dashboard designed for tracking, analyzing, and presenting key health performance indicators. The landing page serves as the central "Summary Performance Dashboard," allowing stakeholders to instantly monitor program performance against established targets.
+This application is a comprehensive, agentic AI powered, data visualization and review dashboard designed for tracking, analyzing, and presenting key health performance indicators. The landing page serves as the central "Summary Performance Dashboard," allowing stakeholders to instantly monitor program performance against established targets.
 
 Web DataShare is an opensource alternative to Power-BI & Tableau with a Generative AI twist to it. This is a hobbyist project that is still under development, it's not yet fully ready for production deployment.
 
